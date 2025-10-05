@@ -89,7 +89,40 @@ const useScrollAnimation = () => {
   return { ref, isVisible };
 };
 
-// Custom hook for cursor tracking
+const useCharacterPosition = () => {
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [isWalking, setIsWalking] = useState(false);
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+
+    const handleScroll = () => {
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+      const scrollTop = window.scrollY;
+      const progress = (scrollTop / (documentHeight - windowHeight)) * 100;
+
+      setScrollProgress(progress);
+      setIsWalking(true);
+
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        setIsWalking(false);
+      }, 150);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    handleScroll();
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      clearTimeout(timeout);
+    };
+  }, []);
+
+  return { scrollProgress, isWalking };
+};
+
 const useCursorPosition = () => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
 
@@ -105,167 +138,7 @@ const useCursorPosition = () => {
   return position;
 };
 
-// Petal interface
-interface Petal {
-  id: number;
-  x: number;
-  y: number;
-  rotation: number;
-  scale: number;
-  velocityX: number;
-  velocityY: number;
-  rotationSpeed: number;
-  opacity: number;
-}
-
 // ==================== COMPONENTS ====================
-
-// Sakura Petals Component
-const SakuraPetals: React.FC<{ theme: "dark" | "light" }> = ({ theme }) => {
-  const [petals, setPetals] = useState<Petal[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-  const [lastPosition, setLastPosition] = useState({ x: 0, y: 0 });
-  const petalIdRef = useRef(0);
-  const animationFrameRef = useRef<number | null>(null);
-
-  // Create petals along drag path
-  const createPetal = (x: number, y: number) => {
-    const newPetal: Petal = {
-      id: petalIdRef.current++,
-      x,
-      y,
-      rotation: Math.random() * 360,
-      scale: 0.5 + Math.random() * 0.8,
-      velocityX: (Math.random() - 0.5) * 2,
-      velocityY: Math.random() * 2 + 1,
-      rotationSpeed: (Math.random() - 0.5) * 5,
-      opacity: 1,
-    };
-
-    setPetals((prev) => [...prev, newPetal]);
-  };
-
-  // Mouse event handlers
-  useEffect(() => {
-    const handleMouseDown = (e: MouseEvent) => {
-      setIsDragging(true);
-      setLastPosition({ x: e.clientX, y: e.clientY });
-      createPetal(e.clientX, e.clientY);
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging) {
-        const distance = Math.hypot(
-          e.clientX - lastPosition.x,
-          e.clientY - lastPosition.y
-        );
-
-        // Create petals along the path based on distance
-        if (distance > 10) {
-          const steps = Math.floor(distance / 10);
-          for (let i = 0; i < steps; i++) {
-            const t = i / steps;
-            const x = lastPosition.x + (e.clientX - lastPosition.x) * t;
-            const y = lastPosition.y + (e.clientY - lastPosition.y) * t;
-            createPetal(x, y);
-          }
-          setLastPosition({ x: e.clientX, y: e.clientY });
-        }
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    window.addEventListener("mousedown", handleMouseDown);
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      window.removeEventListener("mousedown", handleMouseDown);
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isDragging, lastPosition]);
-
-  // Animate petals
-  useEffect(() => {
-    const animate = () => {
-      setPetals((prev) => {
-        return prev
-          .map((petal) => ({
-            ...petal,
-            x: petal.x + petal.velocityX,
-            y: petal.y + petal.velocityY,
-            rotation: petal.rotation + petal.rotationSpeed,
-            velocityX: petal.velocityX + (Math.random() - 0.5) * 0.2,
-            velocityY: petal.velocityY + 0.1,
-            opacity: petal.opacity - 0.005,
-          }))
-          .filter(
-            (petal) => petal.opacity > 0 && petal.y < window.innerHeight + 100
-          );
-      });
-
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-
-    animationFrameRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, []);
-
-  return (
-    <div className="fixed inset-0 pointer-events-none z-40">
-      {petals.map((petal) => (
-        <div
-          key={petal.id}
-          className="absolute transition-opacity"
-          style={{
-            left: petal.x,
-            top: petal.y,
-            transform: `translate(-50%, -50%) rotate(${petal.rotation}deg) scale(${petal.scale})`,
-            opacity: petal.opacity,
-          }}
-        >
-          <svg
-            width="30"
-            height="30"
-            viewBox="0 0 30 30"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            {/* Sakura petal shape */}
-            <path
-              d="M15 2C15 2 10 8 10 15C10 18 12 20 15 20C18 20 20 18 20 15C20 8 15 2 15 2Z"
-              fill={theme === "dark" ? "#FCA5A5" : "#DC2626"}
-              opacity="0.8"
-            />
-            <path
-              d="M15 2C15 2 12 5 12 10C12 12 13 13 15 13C17 13 18 12 18 10C18 5 15 2 15 2Z"
-              fill={theme === "dark" ? "#FEE2E2" : "#EF4444"}
-              opacity="0.6"
-            />
-            {/* Petal details */}
-            <ellipse
-              cx="15"
-              cy="12"
-              rx="2"
-              ry="6"
-              fill={theme === "dark" ? "#FFFFFF" : "#FFFFFF"}
-              opacity="0.3"
-            />
-          </svg>
-        </div>
-      ))}
-    </div>
-  );
-};
 
 // Interactive Background Component
 const InteractiveBackground: React.FC<{ theme: "dark" | "light" }> = ({
@@ -301,18 +174,191 @@ const InteractiveBackground: React.FC<{ theme: "dark" | "light" }> = ({
           }}
         ></div>
       </div>
-
-      {/* Cursor glow effect */}
-      <div
-        className="fixed w-8 h-8 rounded-full pointer-events-none mix-blend-difference z-50 transition-transform duration-150"
-        style={{
-          left: `${cursorPosition.x - 16}px`,
-          top: `${cursorPosition.y - 16}px`,
-          background: "rgba(255, 255, 255, 0.5)",
-          filter: "blur(8px)",
-        }}
-      />
     </>
+  );
+};
+
+// RPG Character on the left
+const RPGCharacter: React.FC<{ theme: "dark" | "light" }> = ({ theme }) => {
+  const { scrollProgress, isWalking } = useCharacterPosition();
+  const [frame, setFrame] = useState(0);
+
+  useEffect(() => {
+    if (isWalking) {
+      const interval = setInterval(() => {
+        setFrame((f) => (f + 1) % 4);
+      }, 150);
+      return () => clearInterval(interval);
+    }
+  }, [isWalking]);
+
+  // Responsive left position
+  const leftPosition =
+    typeof window !== "undefined" && window.innerWidth < 768 ? "5%" : "8%";
+
+  return (
+    <div
+      className="hidden md:block fixed z-40 transition-all duration-200"
+      style={{
+        left: leftPosition,
+        top: `${10 + scrollProgress * 0.7}%`,
+      }}
+    >
+      <div className={`relative ${isWalking ? "animate-bounce-subtle" : ""}`}>
+        <div
+          className={`w-12 h-16 relative ${
+            theme === "dark"
+              ? "drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]"
+              : "drop-shadow-[0_0_10px_rgba(220,38,38,0.3)]"
+          }`}
+        >
+          <svg viewBox="0 0 32 48" className="w-full h-full">
+            <rect
+              x="10"
+              y="4"
+              width="12"
+              height="12"
+              fill={theme === "dark" ? "#FCA5A5" : "#FEE2E2"}
+            />
+            <rect
+              x="8"
+              y="16"
+              width="16"
+              height="16"
+              fill={theme === "dark" ? "#EF4444" : "#DC2626"}
+            />
+            <rect
+              x="4"
+              y="18"
+              width="4"
+              height="10"
+              fill={theme === "dark" ? "#EF4444" : "#DC2626"}
+              className={isWalking && frame % 2 === 0 ? "translate-y-1" : ""}
+            />
+            <rect
+              x="24"
+              y="18"
+              width="4"
+              height="10"
+              fill={theme === "dark" ? "#EF4444" : "#DC2626"}
+              className={isWalking && frame % 2 === 1 ? "translate-y-1" : ""}
+            />
+            <rect
+              x="10"
+              y="32"
+              width="5"
+              height="12"
+              fill={theme === "dark" ? "#B91C1C" : "#991B1B"}
+              className={isWalking && frame % 2 === 0 ? "translate-y-1" : ""}
+            />
+            <rect
+              x="17"
+              y="32"
+              width="5"
+              height="12"
+              fill={theme === "dark" ? "#B91C1C" : "#991B1B"}
+              className={isWalking && frame % 2 === 1 ? "translate-y-1" : ""}
+            />
+            <rect x="13" y="8" width="2" height="2" fill="#1F2937" />
+            <rect x="17" y="8" width="2" height="2" fill="#1F2937" />
+          </svg>
+        </div>
+
+        {isWalking && (
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+            <div
+              className={`w-1 h-1 rounded-full ${
+                theme === "dark" ? "bg-red-500/50" : "bg-red-600/50"
+              } animate-ping`}
+            ></div>
+            <div
+              className={`w-1 h-1 rounded-full ${
+                theme === "dark" ? "bg-red-500/50" : "bg-red-600/50"
+              } animate-ping`}
+              style={{ animationDelay: "0.1s" }}
+            ></div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// RPG Path on the left side
+const RPGPath: React.FC<{ theme: "dark" | "light" }> = ({ theme }) => {
+  return (
+    <div
+      className="hidden md:block fixed top-0 bottom-0 pointer-events-none z-0"
+      style={{ left: "8%", width: "80px" }}
+    >
+      {/* Main path */}
+      <div
+        className={`absolute inset-0 ${
+          theme === "dark"
+            ? "bg-gradient-to-b from-red-950/30 via-red-900/20 to-red-950/30"
+            : "bg-gradient-to-b from-red-100/50 via-red-50/30 to-red-100/50"
+        }`}
+      >
+        {/* Path stripes */}
+        <div className="absolute inset-0 flex flex-col justify-around">
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className={`h-8 mx-auto ${
+                theme === "dark" ? "bg-red-500/20" : "bg-red-600/20"
+              }`}
+              style={{ width: "4px" }}
+            ></div>
+          ))}
+        </div>
+      </div>
+
+      {/* Path borders */}
+      <div
+        className={`absolute left-0 top-0 bottom-0 w-1 ${
+          theme === "dark" ? "bg-red-500/30" : "bg-red-600/30"
+        }`}
+      ></div>
+      <div
+        className={`absolute right-0 top-0 bottom-0 w-1 ${
+          theme === "dark" ? "bg-red-500/30" : "bg-red-600/30"
+        }`}
+      ></div>
+    </div>
+  );
+};
+
+// Route Sign Component
+const RouteSign: React.FC<{
+  number: string;
+  name: string;
+  theme: "dark" | "light";
+}> = ({ number, name, theme }) => {
+  return (
+    <div className="flex justify-start mb-12 md:ml-48">
+      <div
+        className={`relative px-8 py-4 border-4 ${
+          theme === "dark"
+            ? "bg-red-950/80 border-red-500/60 shadow-lg shadow-red-500/20"
+            : "bg-white/90 border-red-600/60 shadow-xl shadow-red-600/20"
+        } backdrop-blur-sm`}
+      >
+        <div
+          className={`text-sm font-black uppercase tracking-widest mb-1 ${
+            theme === "dark" ? "text-red-400" : "text-red-600"
+          }`}
+        >
+          ROUTE {number}
+        </div>
+        <div
+          className={`text-2xl font-black tracking-tight ${
+            theme === "dark" ? "text-white" : "text-black"
+          }`}
+        >
+          {name}
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -449,7 +495,7 @@ const Hero: React.FC<HeroProps> = ({ theme }) => {
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
       }`}
     >
-      <div className="max-w-5xl text-center">
+      <div className="max-w-5xl text-center md:ml-48">
         <div className="mb-8">
           <div
             className={`text-7xl md:text-9xl font-black mb-6 tracking-tighter animate-fade-in ${
@@ -525,13 +571,22 @@ const Hero: React.FC<HeroProps> = ({ theme }) => {
           }`}
         >
           <Download size={24} strokeWidth={2.5} />
-          Download Resume
+          DOWNLOAD RESUME
         </button>
 
-        <div className="mt-20 animate-bounce">
+        <div className="mt-20 flex flex-col items-center gap-2">
+          <div
+            className={`text-sm font-black uppercase tracking-widest ${
+              theme === "dark" ? "text-red-500" : "text-red-600"
+            }`}
+          >
+            ▼ START JOURNEY ▼
+          </div>
           <ChevronDown
             size={40}
-            className={theme === "dark" ? "text-red-500" : "text-red-600"}
+            className={`${
+              theme === "dark" ? "text-red-500" : "text-red-600"
+            } animate-bounce`}
             strokeWidth={3}
           />
         </div>
@@ -551,9 +606,11 @@ const About: React.FC<HeroProps> = ({ theme }) => {
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
       }`}
     >
-      <div className="max-w-5xl">
+      <div className="max-w-4xl md:ml-48">
+        <RouteSign number="01" name="ABOUT TOWN" theme={theme} />
+
         <h2
-          className={`text-5xl md:text-7xl font-black mb-12 tracking-tighter ${
+          className={`text-5xl md:text-6xl font-black mb-8 tracking-tighter ${
             theme === "dark" ? "text-white" : "text-black"
           }`}
         >
@@ -563,7 +620,7 @@ const About: React.FC<HeroProps> = ({ theme }) => {
           </span>
         </h2>
         <div
-          className={`text-xl md:text-2xl space-y-8 font-medium leading-relaxed ${
+          className={`text-lg md:text-xl space-y-6 font-medium leading-relaxed ${
             theme === "dark" ? "text-gray-300" : "text-gray-700"
           }`}
         >
@@ -599,8 +656,8 @@ const About: React.FC<HeroProps> = ({ theme }) => {
             >
               14,000 articles
             </span>{" "}
-            with 90% accuracy. I've built blockchain data extraction systems and
-            real-time data streaming architectures.
+            with 90% accuracy. I've also built blockchain data extraction
+            systems and real-time data streaming architectures.
           </p>
           <p>
             Currently completing my Bachelor's in{" "}
@@ -634,9 +691,11 @@ const TechStack: React.FC<HeroProps> = ({ theme }) => {
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
       }`}
     >
-      <div className="max-w-6xl w-full">
+      <div className="max-w-6xl w-full md:ml-48">
+        <RouteSign number="02" name="TECH FOREST" theme={theme} />
+
         <h2
-          className={`text-5xl md:text-7xl font-black mb-16 text-center tracking-tighter ${
+          className={`text-5xl md:text-6xl font-black mb-12 tracking-tighter ${
             theme === "dark" ? "text-white" : "text-black"
           }`}
         >
@@ -732,9 +791,11 @@ const Projects: React.FC<HeroProps> = ({ theme }) => {
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
       }`}
     >
-      <div className="max-w-6xl w-full">
+      <div className="max-w-6xl w-full md:ml-48">
+        <RouteSign number="03" name="PROJECT VALLEY" theme={theme} />
+
         <h2
-          className={`text-5xl md:text-7xl font-black mb-16 text-center tracking-tighter ${
+          className={`text-5xl md:text-6xl font-black mb-12 tracking-tighter ${
             theme === "dark" ? "text-white" : "text-black"
           }`}
         >
@@ -856,9 +917,11 @@ const Experience: React.FC<HeroProps> = ({ theme }) => {
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
       }`}
     >
-      <div className="max-w-5xl w-full">
+      <div className="max-w-5xl w-full md:ml-48">
+        <RouteSign number="04" name="BATTLE GROUNDS" theme={theme} />
+
         <h2
-          className={`text-5xl md:text-7xl font-black mb-16 text-center tracking-tighter ${
+          className={`text-5xl md:text-6xl font-black mb-12 tracking-tighter ${
             theme === "dark" ? "text-white" : "text-black"
           }`}
         >
@@ -868,11 +931,11 @@ const Experience: React.FC<HeroProps> = ({ theme }) => {
           EXPERIENCE
         </h2>
 
-        <div className="space-y-16">
+        <div className="space-y-12">
           {experiences.map((exp, idx) => (
             <div
               key={exp.company}
-              className={`relative pl-12 border-l-4 transition-all duration-500 ${
+              className={`relative pl-8 border-l-4 transition-all duration-500 ${
                 theme === "dark" ? "border-red-500/40" : "border-red-600/40"
               }`}
               style={{ animationDelay: `${idx * 200}ms` }}
@@ -916,18 +979,14 @@ const Experience: React.FC<HeroProps> = ({ theme }) => {
               </div>
 
               <ul
-                className={`space-y-3 font-medium ${
+                className={`space-y-2 font-medium ${
                   theme === "dark" ? "text-gray-300" : "text-gray-700"
                 }`}
               >
                 {exp.highlights.map((highlight, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <span
-                      className={`mt-2 w-2 h-2 rounded-full flex-shrink-0 ${
-                        theme === "dark" ? "bg-red-500" : "bg-red-600"
-                      }`}
-                    ></span>
-                    <span className="text-lg">{highlight}</span>
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-2 w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
+                    <span>{highlight}</span>
                   </li>
                 ))}
               </ul>
@@ -977,9 +1036,11 @@ const Contact: React.FC<HeroProps> = ({ theme }) => {
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
       }`}
     >
-      <div className="max-w-5xl w-full text-center">
+      <div className="max-w-4xl w-full md:ml-48">
+        <RouteSign number="05" name="FINAL DESTINATION" theme={theme} />
+
         <h2
-          className={`text-5xl md:text-7xl font-black mb-12 tracking-tighter ${
+          className={`text-5xl md:text-6xl font-black mb-8 tracking-tighter ${
             theme === "dark" ? "text-white" : "text-black"
           }`}
         >
@@ -990,14 +1051,15 @@ const Contact: React.FC<HeroProps> = ({ theme }) => {
         </h2>
 
         <p
-          className={`text-2xl mb-16 font-bold ${
+          className={`text-xl mb-12 ${
             theme === "dark" ? "text-gray-400" : "text-gray-600"
           }`}
         >
-          Let's build something amazing together.
+          I'm always open to discussing new projects, opportunities, or just
+          having a chat about technology.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
           {contactInfo.map((info, idx) => {
             const IconComponent = info.icon;
             return (
@@ -1006,31 +1068,25 @@ const Contact: React.FC<HeroProps> = ({ theme }) => {
                 href={info.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`p-8 rounded-2xl transition-all hover:scale-105 border-2 ${
+                className={`p-6 rounded-2xl transition-all hover:scale-105 ${
                   theme === "dark"
-                    ? "bg-red-950/20 backdrop-blur-lg border-red-500/30 hover:border-red-500/60 hover:bg-red-950/30"
-                    : "bg-white/80 backdrop-blur-lg border-red-600/20 hover:border-red-600/50 hover:bg-red-50/80 hover:shadow-2xl hover:shadow-red-600/10"
+                    ? "bg-red-950/20 backdrop-blur-lg border-2 border-red-500/30 hover:bg-red-950/30 hover:border-red-500/60"
+                    : "bg-white/80 backdrop-blur-lg border-2 border-red-600/20 hover:bg-red-50/80 hover:border-red-600/50 hover:shadow-xl hover:shadow-red-600/10"
                 }`}
                 style={{ animationDelay: `${idx * 100}ms` }}
               >
-                <IconComponent
-                  className={`mx-auto mb-6 ${
-                    theme === "dark" ? "text-red-400" : "text-red-600"
-                  }`}
-                  size={40}
-                  strokeWidth={2.5}
-                />
+                <IconComponent className="mx-auto mb-4" size={32} />
                 <div
-                  className={`font-black text-lg mb-2 uppercase tracking-wider ${
+                  className={`font-semibold mb-1 ${
                     theme === "dark" ? "text-white" : "text-black"
                   }`}
                 >
                   {info.label}
                 </div>
                 <div
-                  className={`font-bold ${
+                  className={
                     theme === "dark" ? "text-gray-400" : "text-gray-600"
-                  }`}
+                  }
                 >
                   {info.value}
                 </div>
@@ -1040,8 +1096,8 @@ const Contact: React.FC<HeroProps> = ({ theme }) => {
         </div>
 
         <div
-          className={`text-sm font-bold uppercase tracking-widest ${
-            theme === "dark" ? "text-gray-600" : "text-gray-500"
+          className={`text-sm ${
+            theme === "dark" ? "text-gray-500" : "text-gray-500"
           }`}
         >
           © 2025 Asmit Ghosh. Built with Next.js & Tailwind CSS.
@@ -1059,11 +1115,17 @@ export default function Portfolio() {
 
   return (
     <div
-      className={`min-h-screen transition-colors duration-500 font-sans ${
+      className={`min-h-screen transition-colors duration-300 ${
         theme === "dark" ? "bg-black text-white" : "bg-white text-black"
       }`}
     >
       <InteractiveBackground theme={theme} />
+
+      {/* RPG Path on left */}
+      <RPGPath theme={theme} />
+
+      {/* Walking Character on left */}
+      <RPGCharacter theme={theme} />
 
       <Navigation
         theme={theme}
@@ -1077,7 +1139,7 @@ export default function Portfolio() {
       <Experience theme={theme} />
       <Contact theme={theme} />
 
-      <style jsx global>{`
+      {/* <style jsx global>{`
         @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
 
         * {
@@ -1088,7 +1150,7 @@ export default function Portfolio() {
         @keyframes fade-in {
           from {
             opacity: 0;
-            transform: translateY(30px);
+            transform: translateY(20px);
           }
           to {
             opacity: 1;
@@ -1097,7 +1159,21 @@ export default function Portfolio() {
         }
 
         .animate-fade-in {
-          animation: fade-in 1s ease-out;
+          animation: fade-in 0.8s ease-out;
+        }
+
+        @keyframes bounce-subtle {
+          0%,
+          100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-4px);
+          }
+        }
+
+        .animate-bounce-subtle {
+          animation: bounce-subtle 0.3s ease-in-out;
         }
 
         ::selection {
@@ -1109,16 +1185,7 @@ export default function Portfolio() {
         html {
           scroll-behavior: smooth;
         }
-
-        body {
-          cursor: none;
-        }
-
-        a,
-        button {
-          cursor: none;
-        }
-      `}</style>
+      `}</style> */}
     </div>
   );
 }
